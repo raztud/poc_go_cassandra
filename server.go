@@ -64,7 +64,7 @@ func GetHandler(responseWriter http.ResponseWriter, request *http.Request) {
 
 	if err := session.Query(`SELECT  createdon, description, title FROM notes WHERE id = ?`, id).
 		Consistency(gocql.One).Scan(&createdon, &description, &title); err != nil {
-		log.Fatal(err)
+		log.Println(err, id)
 	}
 
 	note.Id = id
