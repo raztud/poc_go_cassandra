@@ -3,26 +3,22 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	//"strconv"
 	"time"
 	"log"
 
 	"github.com/gorilla/mux"
 	"github.com/gocql/gocql"
+
 )
 
 type Note struct {
+	Id	    string    `json:"id"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
-	CreatedOn   int64     `json:"createdon"`
+	CreatedOn   int64     `json:"createdOn"`
 }
 
-//store
-//var store = make(map[string]Note)
-//var id int = 0
-
 var session *gocql.Session
-
 
 
 func PostHandler(responseWriter http.ResponseWriter, request *http.Request) {
@@ -36,12 +32,10 @@ func PostHandler(responseWriter http.ResponseWriter, request *http.Request) {
 	note.CreatedOn = time.Now().Unix()
 	session := getSession()
 
-	//k := strconv.Itoa(id)
-	//store[k] = note
-
 	cql := `INSERT INTO notes (id, title, description, createdon) VALUES (?, ?, ?, ?)`
 	uuid, _ := gocql.RandomUUID()
-	//
+	note.Id = uuid.String()
+
 	err1 := session.Query(cql, uuid, note.Title, note.Description, note.CreatedOn).Exec()
 	if err1 != nil {
 		log.Println(err1)
@@ -60,22 +54,34 @@ func PostHandler(responseWriter http.ResponseWriter, request *http.Request) {
 
 }
 
-//func GetHandler(responseWriter http.ResponseWriter, request *http.Request) {
-//	var notes []Note
-//
-//	for _, v := range store {
-//		notes = append(notes, v)
-//	}
-//	responseWriter.Header().Set("Content-Type", "application/json")
-//
-//	j, err := json.Marshal(notes)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	responseWriter.WriteHeader(http.StatusOK)
-//	responseWriter.Write(j)
-//}
+func GetHandler(responseWriter http.ResponseWriter, request *http.Request) {
+	var note Note
+	vars := mux.Vars(request)
+	id := vars["id"]
+
+	var description, title string
+	var createdon int64
+
+	if err := session.Query(`SELECT  createdon, description, title FROM notes WHERE id = ?`, id).
+		Consistency(gocql.One).Scan(&createdon, &description, &title); err != nil {
+		log.Fatal(err)
+	}
+
+	note.Id = id
+	note.Description = description
+	note.Title = title
+	note.CreatedOn = createdon
+
+	responseWriter.Header().Set("Content-Type", "application/json")
+
+	j, err := json.Marshal(note)
+	if err != nil {
+		panic(err)
+	}
+
+	responseWriter.WriteHeader(http.StatusOK)
+	responseWriter.Write(j)
+}
 
 func createDbSession() {
 	var err error
@@ -104,7 +110,7 @@ func main() {
 
 	r := mux.NewRouter().StrictSlash(false)
 	r.HandleFunc("/api/notes", PostHandler).Methods("POST")
-	//r.HandleFunc("/api/notes", GetHandler).Methods("GET")
+	r.HandleFunc("/api/notes/{id}", GetHandler).Methods("GET")
 	server := &http.Server {
 		Addr: ":8080",
 		Handler: r,
