@@ -9,6 +9,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gocql/gocql"
 
+	"github.com/aws/aws-sdk-go/aws"
+	awsSession "github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
 type Note struct {
@@ -106,7 +109,19 @@ func getSession() *gocql.Session {
 
 func main() {
 
-	createDbSession()
+	//createDbSession()
+	region := "us-east-1"
+	svc := dynamodb.New(awsSession.New(&aws.Config{Region: aws.String(region)}))
+	result, err := svc.ListTables(&dynamodb.ListTablesInput{})
+
+	if err != nil {
+	    log.Println(err)
+	    return
+	}
+
+	for _, table := range result.TableNames {
+	    log.Println(*table)
+	}
 
 	r := mux.NewRouter().StrictSlash(false)
 	r.HandleFunc("/api/notes", PostHandler).Methods("POST")
